@@ -21,7 +21,7 @@
   
     // Firebase config
     const firebaseConfig = {
-      apiKey: "AIzaSyA3Is_0asWmNhGVN72fSzTwWS7mmdAOKAs",
+      apiKey: "FIREBSE_API_KEY",
       authDomain: "trip-planner-genai-hackathon.firebaseapp.com",
       projectId: "trip-planner-genai-hackathon",
       storageBucket: "trip-planner-genai-hackathon.firebasestorage.app",
@@ -63,7 +63,7 @@
   if (sessionId && userId) {
     const chatWindow = document.getElementById("chatWindow");
 
-    fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+    fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -110,7 +110,7 @@ window.logoutUser = function () {
 
     // First destroy the session on backend
     if (sessionId && userId) {
-      fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/destroy_session", {
+      fetch("[AGENT_CLOUDRUN_LINK]/destroy_session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -234,7 +234,7 @@ window.sendMessage = function () {
     const isHandover = localStorage.getItem("handover_mode") === "true";
 
 
-    fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+    fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -272,7 +272,7 @@ window.sendMessage = function () {
 
 
                 // 🔹 NEW: Ask agent to list all places from itinerary
-                fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+                fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -322,7 +322,7 @@ window.sendMessage = function () {
                   renderedReply = `<span class="chat-message bot-msg">${cleaned}</span>`;
 
                   // 🔹 Immediately send internal message to agent
-                  fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+                  fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -433,7 +433,7 @@ window.sendMessage = function () {
   // ---- Helper: Save to backend ----
   function saveToBackend(endpoint, payload) {
     return fetch(
-      `https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/${endpoint}`,
+      `[AGENT_CLOUDRUN_LINK]/${endpoint}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
