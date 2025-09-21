@@ -1,0 +1,165 @@
+<?php
+// trip.php
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Personalised Trip Planner</title>
+
+    <script type="module">
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup } 
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    // Your Firebase config (replace with your project’s config from Firebase Console)
+    const firebaseConfig = {
+        apiKey: "AIzaSyA3Is_0asWmNhGVN72fSzTwWS7mmdAOKAs",
+        authDomain: "trip-planner-genai-hackathon.firebaseapp.com",
+        projectId: "trip-planner-genai-hackathon",
+        storageBucket: "trip-planner-genai-hackathon.firebasestorage.app",
+        messagingSenderId: "1071638693675",
+        appId: "1:1071638693675:web:bb6045a93e5c3ac4e5676e",
+        measurementId: "G-5C8ZLEJDG7"
+      };
+
+    // Init Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // Function to login and redirect
+
+    window.bookTrip = function () {
+  signInWithPopup(auth, provider)
+    .then((result) => {
+      console.log("User signed in:", result.user.displayName);
+
+      const firstName = result.user.displayName
+        ? result.user.displayName.split(" ")[0]
+        : result.user.uid; // fallback if no displayName
+
+      // Create ADK session after login
+      fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/create_session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: firstName   // pass displayName as user_id
+        }),
+      })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Session created:", data);
+
+        // Store session info in localStorage (so frontend can reuse it)
+        localStorage.setItem("session_id", data.session_id);
+        localStorage.setItem("user_id", data.user_id);
+
+        // Redirect after login
+        window.location.href = "booking.html";
+      })
+      .catch((err) => {
+        console.error("Session creation failed:", err);
+      });
+    })
+    .catch((error) => {
+      console.error("Login failed:", error);
+      alert("Authentication failed. Please try again.");
+    });
+};
+
+
+    
+        
+    </script>
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            background: #f0f4f8;
+            color: #333;
+            height: 100%;
+            width: 100%;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: #1e3a8a;
+            color: white;
+            text-align: center;
+           
+            font-size: 48px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        main img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        footer {
+            width: 100%;
+            background: #1e3a8a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        footer .credit {
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        footer button {
+            background: #facc15;
+            color: #111;
+            padding: 14px 24px;
+            text-decoration: none;
+            font-weight: bold;
+            border-radius: 6px;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
+            transition: background 0.3s ease;
+        }
+        footer a:hover {
+            background: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        Personalised Trip Planner
+    </header>
+    <main>
+        <img src="image/easemytrip.png" alt="Trip Image">
+    </main>
+    <footer>
+        <button onclick="bookTrip()">Book Your Trip</button>
+        <br>
+        <div class="credit">
+            Designed and developed by <strong>Team GSDL</strong> 
+            (Souvik Sankar Mitra and Devendra Nagpure) for 
+            <strong>Google GenAI Exchange Hackathon</strong>
+        </div>
+        
+    </footer>
+
+    
+</body>
+</html>

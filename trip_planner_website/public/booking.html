@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Booking Page</title>
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+
+  <!-- ArcGIS JS API -->
+<link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.30/"></script>
+
+
+  <script type="module">
+    // Import Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } 
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyA3Is_0asWmNhGVN72fSzTwWS7mmdAOKAs",
+      authDomain: "trip-planner-genai-hackathon.firebaseapp.com",
+      projectId: "trip-planner-genai-hackathon",
+      storageBucket: "trip-planner-genai-hackathon.firebasestorage.app",
+      messagingSenderId: "1071638693675",
+      appId: "1:1071638693675:web:bb6045a93e5c3ac4e5676e",
+      measurementId: "G-5C8ZLEJDG7"
+    };
+  
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+  
+    // Protect page
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const fullName = user.displayName || "Guest";
+        const firstName = fullName.split(" ")[0];  // take only the first word
+        document.getElementById("username").innerText = `Welcome, ${user.displayName}`;
+  
+        // Inject bot welcome message
+        // const chatWindow = document.getElementById("chatWindow");
+        // const botMsg = document.createElement("div");
+        // botMsg.className = "text-start mb-2";
+        // botMsg.innerHTML = `<span class="chat-message bot-msg">
+        //   Hello ${firstName}, I can help you plan your perfect holiday. 
+        //   To get started, please tell me where you'd like to go.
+        // </span>`;
+        // chatWindow.appendChild(botMsg);
+      } else {
+        window.location.href = "index.html";
+      }
+    });
+
+
+    const sessionId = localStorage.getItem("session_id");
+    const userId = localStorage.getItem("user_id");
+    const first_n = userId.split(" ")[0];
+
+// Automatically notify agent when session is created
+  if (sessionId && userId) {
+    const chatWindow = document.getElementById("chatWindow");
+
+    fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: first_n,
+        session_id: sessionId,
+        text: "session created"
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Agent response (session created):", data);
+
+        const reply =
+          data.responses && data.responses.length > 0
+            ? data.responses[0]
+            : "No welcome response received.";
+
+        const botMsg = document.createElement("div");
+        botMsg.className = "text-start mb-2";
+        botMsg.innerHTML = `<span class="chat-message bot-msg">${reply}</span>`;
+        chatWindow.appendChild(botMsg);
+
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      })
+      .catch((err) => {
+        console.error("Error sending session created:", err);
+
+        const botMsg = document.createElement("div");
+        botMsg.className = "text-start mb-2";
+        botMsg.innerHTML = `<span class="chat-message bot-msg">Failed to initialize chat session.</span>`;
+        chatWindow.appendChild(botMsg);
+      });
+  }
+
+
+
+  
+    // Logout
+// Logout
+window.logoutUser = function () {
+  if (confirm("Do you really want to logout?")) {
+    const sessionId = localStorage.getItem("session_id");
+    const userId = localStorage.getItem("user_id");
+
+    // First destroy the session on backend
+    if (sessionId && userId) {
+      fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/destroy_session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: first_n,
+          session_id: sessionId
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log("Session destroyed:", data);
+        })
+        .catch((err) => {
+          console.error("Error destroying session:", err);
+        })
+        .finally(() => {
+          // Clear session info from localStorage
+          localStorage.removeItem("session_id");
+          localStorage.removeItem("user_id");
+          localStorage.clear();   // clears all keys for the current domain
+
+
+          // Now sign out from Firebase
+          signOut(auth)
+            .then(() => {
+              window.location.href = "index.html";
+            })
+            .catch((error) => {
+              alert("Logout failed. Try again.");
+              console.error(error);
+            });
+        });
+    } else {
+      // If no session exists, just logout
+      signOut(auth)
+        .then(() => {
+          window.location.href = "index.html";
+        })
+        .catch((error) => {
+          alert("Logout failed. Try again.");
+          console.error(error);
+        });
+    }
+  }
+};
+
+  
+    // Sidebar toggle
+    window.toggleSidebar = function () {
+      document.getElementById("sidebar").classList.toggle("active");
+    };
+  
+    // Chatbot send message
+
+let firstAgentResponded = true; // flag to track if first agent message arrived
+
+
+window.sendMessage = function () {
+  const input = document.getElementById("chatInput");
+  const message = input.value.trim();
+  if (message === "") return;
+
+  const chatWindow = document.getElementById("chatWindow");
+
+  // Append user message
+  const userMsg = document.createElement("div");
+  userMsg.className = "text-end mb-2";
+  userMsg.innerHTML = `<span class="chat-message user-msg">${message}</span>`;
+  chatWindow.appendChild(userMsg);
+
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+  input.value = "";
+
+  // Add loading placeholder
+  const loadingMsg = document.createElement("div");
+  loadingMsg.className = "text-start mb-2";
+  loadingMsg.innerHTML = `
+    <span class="chat-message bot-msg">
+      <span class="loading-spinner"></span> Typing...
+    </span>
+  `;
+  chatWindow.appendChild(loadingMsg);
+
+  const sessionId = localStorage.getItem("session_id");
+  const userId = localStorage.getItem("user_id");
+
+  // ---- Detect & Store Variables ----
+  let payload = { session_id: sessionId, user_id: userId };
+
+  if (firstAgentResponded) {
+    // PLACE detection
+    if (!localStorage.getItem("place_name") && isNaN(message)) {
+      localStorage.setItem("place_name", message);
+      payload.place_name = message;
+      console.log("Place name detected:", message);
+    }
+
+    // DURATION detection
+    if (!localStorage.getItem("duration") && /day/i.test(message)) {
+      const duration = message.match(/\d+/)?.[0] || "";
+      if (duration) {
+        localStorage.setItem("duration", duration);
+        payload.duration = duration;
+        console.log("Duration detected:", duration);
+      }
+    }
+
+    // BUDGET detection
+    if (!localStorage.getItem("budget") && /(₹|rs|inr|\$|budget)/i.test(message)) {
+      const budget = message.match(/\d[\d,]*/)?.[0]?.replace(/,/g, "") || "";
+      if (budget) {
+        localStorage.setItem("budget", budget);
+        payload.budget = budget;
+        console.log("Budget detected:", budget);
+      }
+    }
+  }
+
+  // ---- Send flow ----
+  const sendMessageToAgent = () => {
+
+    const isHandover = localStorage.getItem("handover_mode") === "true";
+
+
+    fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        session_id: sessionId,
+        text: message,
+        handover: isHandover
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const reply =
+          data.responses && data.responses.length > 0
+            ? data.responses[0]
+            : "Sorry, I didn't understand that.";
+
+            let renderedReply;
+
+            try {
+
+              // console.log (reply)
+                // Remove ```json ... ``` wrappers if present
+                const cleanReply = reply.replace(/```json|```/gi, "").trim();
+                // const cleanReply = cleanReply.replace(/can you confirm this itine?ry\??/i, "").trim();
+
+                // console.log(cleanReply)
+
+                // Try parsing as JSON
+                const itinerary = JSON.parse(cleanReply);
+
+                // console.log(itinerary)
+
+                // If parsing succeeds → render structured itinerary
+                renderedReply = renderItinerary(itinerary);
+
+
+                // 🔹 NEW: Ask agent to list all places from itinerary
+                fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    user_id: userId,
+                    session_id: sessionId,
+                    text: "list out all places present in the itinery. don't put extra texts just list out the places separated by comma"
+                  }),
+                })
+                  .then(res => res.json())
+                  .then(data2 => {
+                    if (data2.responses && data2.responses.length > 0) {
+
+                      localStorage.setItem("places",data2.responses[0] );
+
+                      payload.places = "["+data2.responses[0]+"]"
+
+                      saveToBackend("save_user_input", payload)
+
+                      
+
+                      // payload.places = c;
+                      // Save places string to an event/global variable
+                      window.eventPlaces = data2.responses[0];
+                      
+                      console.log("Places extracted from itinerary:", window.eventPlaces);
+                    }
+                  })
+
+
+
+  .catch(err => console.error("Error extracting places:", err));
+
+              } catch (e) {
+                // If not JSON, just show raw text
+                // renderedReply = `<span class="chat-message bot-msg">${reply}</span>`;
+
+                if (/\[handover\]/i.test(reply)) {
+                  console.log("Handover detected → Switching to Hotel Booking Agent");
+
+                  // Save state in localStorage
+                  localStorage.setItem("handover_mode", "true");
+
+                  // Remove [handover] and everything after it
+                  const cleaned = reply.split('[handover]')[0].trim();
+
+                  // Show cleaned thank-you message in chat
+                  renderedReply = `<span class="chat-message bot-msg">${cleaned}</span>`;
+
+                  // 🔹 Immediately send internal message to agent
+                  fetch("https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/send_message", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      user_id: userId,
+                      session_id: sessionId,
+                      text: "switch to hotel booking agent.",
+                      handover: true
+                    }),
+                  })
+                    .then(res => res.json())
+                    .then(data2 => {
+                      const bookingReply =
+                        data2.responses && data2.responses.length > 0
+                          ? data2.responses[0]
+                          : "Hotel booking agent not available right now.";
+
+                      // Append hotel booking agent reply
+                      const bookingMsg = document.createElement("div");
+                      bookingMsg.className = "text-start mb-2";
+                      bookingMsg.innerHTML = `<span class="chat-message bot-msg">${bookingReply}</span>`;
+                      chatWindow.appendChild(bookingMsg);
+                      chatWindow.scrollTop = chatWindow.scrollHeight;
+                    })
+                    .catch(err => {
+                      console.error("Error switching to hotel booking agent:", err);
+                    });
+                }
+
+
+
+
+                // If not JSON, check if it's the "Very nice!" options
+               else if (/Very nice!/i.test(reply) && /Fast-Paced/i.test(reply)) {
+                    renderedReply = renderOptions(reply);
+                  } 
+
+               else if (/\|.+\|/s.test(reply) && reply.includes("---")) {
+
+
+                 
+                (async () => {
+                    const geoData = await fetchgeocode();    // geoData is returned JSON
+
+                    // inspect
+                    console.log("geoData after fetchgeocode:", geoData);
+                    console.log("window.geocodedPlaces:", window.geocodedPlaces);
+
+                    openmap();
+
+                    // Now render table
+                    const htmlTable = await markdownTableToHTML(reply);  // reply is your markdown string
+                    // console.log("htmlTable:", reply);          // should be <div>...</div>
+
+                    // renderedReply = `<div class="chat-message bot-msg">${reply}</div>`;
+
+                    // renderedReply = htmlTable;
+                        // Assign result back
+                    renderedReply = htmlTable;
+
+                // Update chat window
+                loadingMsg.innerHTML = renderedReply;
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+
+                  })();
+
+                  return;
+
+
+
+                }
+                  
+                  
+                  
+                  
+                  
+                  else {
+                    // Fallback to plain text
+                    renderedReply = `<span class="chat-message bot-msg">${reply}</span>`;
+                   
+                  }
+              }
+
+
+              loadingMsg.innerHTML = renderedReply;
+              chatWindow.scrollTop = chatWindow.scrollHeight;
+
+
+        // loadingMsg.innerHTML = `<span class="chat-message bot-msg">${reply}</span>`;
+        // chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        if (!firstAgentResponded) {
+          firstAgentResponded = true;
+        }
+      })
+      .catch((err) => {
+        console.error("Error sending message:", err);
+        loadingMsg.innerHTML = `<span class="chat-message bot-msg">Error talking to agent.</span>`;
+      });
+  };
+
+  // ---- Save first, then send ----
+  if (payload.place_name || payload.duration || payload.budget) {
+    saveToBackend("save_user_input", payload).then(sendMessageToAgent);
+  } else {
+    sendMessageToAgent();
+  }
+
+  // ---- Helper: Save to backend ----
+  function saveToBackend(endpoint, payload) {
+    return fetch(
+      `https://hotel-search-genai-hackathon-main-820071125653.asia-south1.run.app/${endpoint}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        console.log(`${endpoint} saved in session:`, data);
+        return data;
+      })
+      .catch((err) => {
+        console.error(`Error saving ${endpoint}:`, err);
+      });
+  }
+};
+
+async function fetchgeocode() {
+  const placesString = localStorage.getItem("places");
+  if (!placesString) {
+    console.warn("No places in localStorage");
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      "https://hotel-search-genai-hackathon-fastapi-820071125653.asia-south1.run.app/geocode",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ place_name: placesString }),
+      }
+    );
+
+    const data = await response.json();
+    console.log("Geocode API returned:", data);
+
+    // store globally
+    window.geocodedPlaces = data;
+    return data;                // <-- return here!
+  } catch (err) {
+    console.error("Error geocoding places:", err);
+    return null;
+  }
+}
+
+
+
+function renderItinerary(itinerary) {
+  let html = `
+    <div class="chat-message bot-msg itinerary-card">
+      <h4>Trip to ${itinerary.destination}</h4>
+      <p><b>People:</b> ${itinerary.num_people}</p>
+      <p><b>Pace:</b> ${itinerary.pace} (${itinerary.duration_days} days)</p>
+      <p><b>Budget:</b> ${itinerary.budget}</p>
+      <hr>
+  `;
+
+  itinerary.itinerary.forEach((dayPlan) => {
+    html += `
+      <div class="day-block">
+        <h5>Day ${dayPlan.day}</h5>
+        <p><b>Morning:</b> ${dayPlan.morning.activity} (₹${dayPlan.morning.budget})</p>
+        <p><b>Lunch:</b> ${dayPlan.lunch.activity} (₹${dayPlan.lunch.budget})</p>
+        <p><b>Afternoon:</b> ${dayPlan.afternoon.activity} (₹${dayPlan.afternoon.budget})</p>
+      </div>
+      <hr>
+    `;
+  });
+
+  html += `
+      <p><b>Total Estimated Budget:</b> ${itinerary.total_budget}</p>
+      <p><i>${itinerary.notes}</i></p>
+
+      <p>Can you confirm this itinerary?</p>
+     
+    </div>
+  `;
+
+  // html += `
+  //                       <div class="mt-2 chat-message bot-msg">Can you confirm this itinery?</div>
+  //                       <button class="btn btn-primary btn-sm" onclick="sendMessage('Yes')">Confirm</button>
+  //                       <button class="btn btn-secondary btn-sm" onclick="sendMessage('No')">Change</button>
+  //                     `;
+  return html;
+}
+
+
+async function markdownTableToHTML(markdown) {
+  // Split lines and remove empty ones
+  const lines = markdown.trim().split("\n").filter(l => l.trim() !== "");
+  if (lines.length < 2) return markdown; // Not a table
+
+  // ---- Detect first line as plain text ----
+  let introText = "";
+  let tableStartIndex = 0;
+  if (!lines[0].includes("|") || !lines[1].includes("---")) {
+    introText = lines[0];
+    tableStartIndex = 1;
+  }
+
+  // ---- Extract headers ----
+  const headersAll = lines[tableStartIndex]
+    .split("|")
+    .map(h => h.trim())
+    .filter(Boolean);
+
+  const latIndex = headersAll.findIndex(h => /lat/i.test(h));
+  const lonIndex = headersAll.findIndex(h => /lon/i.test(h));
+
+  const headers = headersAll.filter((h, idx) => idx !== latIndex && idx !== lonIndex);
+
+  // ---- Extract rows ----
+  const allRows = lines.slice(tableStartIndex + 2).map(row =>
+    row.split("|").map(cell => cell.trim()).filter(Boolean)
+  );
+
+  const latLongArray = [];
+  const rows = allRows.map(r => {
+    if (latIndex !== -1 && lonIndex !== -1) {
+      latLongArray.push([parseFloat(r[latIndex]), parseFloat(r[lonIndex])]);
+    }
+    return r.filter((c, idx) => idx !== latIndex && idx !== lonIndex);
+  });
+
+  // ---- Build HTML ----
+  let html = "";
+  if (introText) {
+    html += `<div class="chat-message bot-msg">${introText}</div>`;
+  }
+
+  html += `<div class="chat-message bot-msg"><table class='table table-bordered table-striped'><thead><tr>`;
+  headers.forEach(h => html += `<th>${h}</th>`);
+  html += "</tr></thead><tbody>";
+
+  rows.forEach((r, rowIndex) => {
+    html += `<tr data-row-index="${rowIndex}">`;
+    r.forEach(c => html += `<td>${c}</td>`);
+    html += "</tr>";
+  });
+  html += "</tbody></table></div>";
+
+  window.hotelLatLongs = latLongArray; // store lat/lngs globally
+
+  // ---- Attach click events to table rows ----
+setTimeout(() => { // ensure DOM exists
+  const headers = Array.from(document.querySelectorAll("table thead th")).map(th => th.textContent.trim());
+
+  document.querySelectorAll("tr[data-row-index]").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const idx = parseInt(tr.getAttribute("data-row-index"));
+      const coords = window.hotelLatLongs[idx];
+
+      // Build dictionary for the clicked row
+      const cells = Array.from(tr.querySelectorAll("td"));
+      const rowData = {};
+      headers.forEach((header, i) => {
+        rowData[header] = cells[i]?.textContent.trim() || null;
+      });
+
+      // Store or log the row data
+      window.lastClickedRowData = rowData; 
+      console.log("Clicked row data:", rowData);
+
+      // Zoom map if available
+      if (window.mapView && coords) {
+        window.mapView.goTo({ center: [coords[1], coords[0]], zoom: 15 })
+          .catch(err => console.error("Map zoom error:", err));
+      } else if (coords) {
+        alert(`Latitude: ${coords[0]}, Longitude: ${coords[1]}`);
+      }
+    });
+  });
+}, 100);
+
+
+  return html;
+}
+
+
+
+
+
+
+
+
+
+
+
+function renderOptions(text) {
+  // Extract destination
+  const destinationMatch = text.match(/cover\s+([A-Za-z\s]+)/i);
+  const destination = destinationMatch ? destinationMatch[1].trim() : "";
+
+  // Extract lines after "Very nice!"
+  const options = text
+    .split(/\n|(?=\d\.)/) // split by newline or numbered list
+    .map((line) => line.trim())
+    .filter((line) => /^\d?\s?.*:\s?.*days/i.test(line));
+
+  const optionsHtml = options
+    .map(
+      (opt) =>
+        `<li class="border rounded p-2 my-1 cursor-pointer hover:bg-gray-100">${opt}</li>`
+    )
+    .join("");
+
+  return `
+    <div class="chat-message bot-msg">
+      <p><strong>Very nice!</strong> Tell me how you want to cover <strong>${destination}</strong>:</p>
+      <ol class="list-none pl-0">${optionsHtml}</ol>
+      <p class="mt-2">Please enter the option number.</p>
+    </div>
+  `;
+}
+
+
+
+
+
+
+
+
+
+
+
+  
+    // Enter key handler
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && document.getElementById("chatInput") === document.activeElement) {
+        sendMessage();
+      }
+    });
+
+
+
+    // Show booking history panel and load map
+    window.openmap = function () {
+
+
+
+      
+  const panel = document.getElementById("bookingHistoryPanel");
+  const chat = document.getElementById("chatContainer");
+
+  panel.classList.toggle("active");
+  chat.classList.toggle("shrink");
+
+  if (!window.mapViewInitialized) {
+    require([
+  "esri/Map",
+  "esri/views/MapView",
+  "esri/Graphic",
+  "esri/layers/GraphicsLayer"
+], function (Map, MapView, Graphic, GraphicsLayer) {
+  const map = new Map({
+    basemap: "streets-vector"
+  });
+
+  const view = new MapView({
+    container: "mapView",
+    map: map,
+    center: [77.2090, 28.6139], // Delhi [lon, lat]
+    zoom: 11
+  });
+
+  // Add a GraphicsLayer for markers
+  const graphicsLayer = new GraphicsLayer();
+  map.add(graphicsLayer);
+
+  // Wait until the view is fully ready before plotting
+  view.when(() => {
+  const allGraphics = [];
+
+  // ---- Plot hotel lat/lngs ----
+  if (window.hotelLatLongs && window.hotelLatLongs.length > 0) {
+    window.hotelLatLongs.forEach(coords => {
+      const [lat, lon] = coords;
+      const point = {
+        type: "point",
+        longitude: lon,
+        latitude: lat
+      };
+
+      const markerSymbol = {
+        type: "picture-marker",
+        url: "https://cdn-icons-png.flaticon.com/512/684/684908.png", // balloon icon
+        width: "32px",
+        height: "32px"
+      };
+
+      const pointGraphic = new Graphic({
+        geometry: point,
+        symbol: markerSymbol
+      });
+
+      graphicsLayer.add(pointGraphic);
+      allGraphics.push(pointGraphic);
+    });
+  } else {
+    console.warn("No hotelLatLongs array found or empty.");
+  }
+
+  // ---- Plot geocoded places with popup ----
+  if (window.geocodedPlaces) {
+    (window.geocodedPlaces.geocoded_places || []).forEach(place => {
+      const [name, lat, lon] = place;
+      const point = { type: "point", longitude: lon, latitude: lat };
+
+      const markerSymbol = {
+        type: "picture-marker",
+        url: "https://cdn-icons-png.flaticon.com/512/190/190411.png", // green balloon icon
+        width: "32px",
+        height: "32px"
+      };
+
+      const graphic = new Graphic({
+        geometry: point,
+        symbol: markerSymbol,
+        attributes: { name },
+        popupTemplate: {
+          title: "{name}",   // show the name dynamically
+          content: "Point of Interest"
+        }
+      });
+
+      graphicsLayer.add(graphic);
+      allGraphics.push(graphic);
+    });
+  }
+
+  // ---- Zoom to extent of all graphics ----
+  if (allGraphics.length > 0) {
+    view.goTo(allGraphics, { padding: 50 }).catch(err => console.error("goTo error:", err));
+  }
+});
+
+
+  window.mapView = view; 
+  window.mapViewInitialized = true;
+});
+
+
+  }
+};
+
+
+  </script>
+  
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: #f0f4f8;
+      color: #333;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    header {
+      background: #1e3a8a;
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 1100;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    #username {
+      font-size: 16px;
+    }
+
+    /* Sidebar styles */
+    #sidebar {
+      position: fixed;
+      left: 0; /* open by default */
+      top: 0;
+      width: 250px;
+      height: 100%;
+      background: #1e3a8a;
+      color: white;
+      padding-top: 60px;
+      z-index: 1000;
+    }
+    #sidebar ul {
+      list-style: none;
+      padding: 0;
+    }
+    #sidebar ul li {
+      padding: 15px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #sidebar ul li:hover {
+      background: #3b5998;
+    }
+
+    /* Chatbot full screen */
+    .chat-container {
+      position: fixed;
+      top: 60px; /* below header */
+      left: 250px; /* after sidebar */
+      right: 0;
+      bottom: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+    #chatWindow {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      background: #f9f9f9;
+    }
+    .chat-input-area {
+      display: flex;
+      border-top: 1px solid #ccc;
+    }
+    .chat-input-area input {
+      flex: 1;
+      border: none;
+      padding: 10px;
+    }
+    .chat-input-area button {
+      border: none;
+      padding: 10px 20px;
+      background: #1e3a8a;
+      color: white;
+    }
+
+    /* Chat message styles */
+/* Chat message styles */
+    .chat-message {
+      display: inline-block;
+      font-size: 16px;   /* slightly smaller than 18px */
+      padding: 10px 14px;
+      border-radius: 10px;
+      line-height: 1.4;
+      max-width: 70%;
+      word-wrap: break-word;
+    }
+
+    /* User message */
+    .user-msg {
+      background: #1e40af;
+      color: white;
+      text-align: right;
+      font-weight: 500;
+    }
+
+    /* Bot message */
+    .bot-msg {
+      background: #6b7280;
+      color: white;
+      text-align: left;
+      font-weight: 500;
+    }
+
+    .loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #ccc;
+  border-top: 2px solid #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+#bookingHistoryPanel {
+  position: fixed;
+  top: 60px; /* below header */
+  right: -500px; /* hidden off screen */
+  width: 500px;
+  height: calc(100% - 60px);
+  background: #fff;
+  box-shadow: -2px 0 6px rgba(0,0,0,0.2);
+  z-index: 1200;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+#bookingHistoryPanel.active {
+  right: 0; /* slide in */
+}
+
+#mapView {
+  flex: 1;
+}
+
+/* default full width */
+#chatContainer {
+  position: fixed;
+  top: 60px;
+  left: 250px;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease, right 0.3s ease;
+}
+
+/* when panel active – reduce width by panel width (400px) */
+#chatContainer.shrink {
+  right: 500px;
+}
+
+
+
+
+
+  </style>
+</head>
+<body>
+  <header>
+    <span class="menu-icon" onclick="toggleSidebar()">☰</span>
+    <h1>Personalised Trip Planner</h1>
+    <span id="username"></span>
+  </header>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <ul>
+      <li onclick="alert('New Booking clicked')">New Booking</li>
+      <li>Booking History</li>
+      <li onclick="logoutUser()">Logout</li>
+    </ul>
+  </div>
+
+  <!-- Chatbot Full Screen -->
+  <div id="chatContainer" class="chat-container">
+    <div id="chatWindow"></div>
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="Type a message..." />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Booking History Sliding Panel -->
+<div id="bookingHistoryPanel">
+  <div id="mapView"></div>
+</div>
+
+</body>
+</html>
