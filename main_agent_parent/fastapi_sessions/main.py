@@ -22,9 +22,8 @@ session_service = InMemorySessionService()
 # Create a runner for the agent
 runner = Runner(agent=root_agent, app_name="main_agent", session_service=session_service)
 
-# -------------------------
+
 # CORS setup
-# -------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://trip-planner-genai-hackathon.web.app"],  # only your frontend
@@ -35,9 +34,8 @@ app.add_middleware(
 
 
 
-# -------------------------
+
 # Request models
-# -------------------------
 class CreateSessionRequest(BaseModel):
     user_id: str
 
@@ -69,9 +67,8 @@ class UserInputRequest(BaseModel):
     places:  Optional[str] = None
 
 
-# -------------------------
+
 # Endpoints
-# -------------------------
 @app.post("/create_session")
 async def create_session(req: CreateSessionRequest):
     """
@@ -110,44 +107,6 @@ async def send_message(req: SendMessageRequest):
 
     return {"responses": responses}
 
-
-
-
-# @app.post("/save_place")
-# async def save_place(req: PlaceRequest):
-#     session = await session_service.get_session(
-#         app_name="main_agent",
-#         user_id=req.user_id,
-#         session_id=req.session_id,
-#     )
-#     if not session:
-#         return {"error": "Session not found"}
-
-#     # # Build state delta
-#     state_changes = {"place_name": req.place_name}
-
-#     # # Create the EventActions
-#     actions = EventActions(state_delta=state_changes)
-
-#     # # Create an Event object
-#     event = Event(
-#         invocation_id=str(uuid.uuid4()),
-#         author="user",             # or whatever makes sense
-#         actions=actions,
-#         timestamp=int(time.time() * 1000)  # milliseconds, or appropriate format
-#         # content or other fields if needed
-#     )
-
-#     # # Append the event
-#     await session_service.append_event(session,event)
-
-#     updated_session = await session_service.get_session(
-#         app_name="main_agent",
-#         user_id=session.user_id,
-#         session_id=req.session_id,
-#     )
-
-#     return {"status": "ok", "session": session}
 
 
 @app.post("/save_user_input")

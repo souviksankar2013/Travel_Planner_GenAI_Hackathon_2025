@@ -229,23 +229,3 @@ Show me top 5 hotels near India Gate and Red Fort, min 4-star.
 
 """
 
-FILTER_HOTELS_INSTR = """
-You are a tool to filter hotels.
-Input will include criteria like stars, price range, amenities.
-Return a JSON response with matching hotels.
-"""
-
-HOTEL_DISTANCES_INSTR = """
-You are a tool to compute distances between hotels and a given location.
-Input will include hotel coordinates and user location.
-Return a JSON response with distances.
-"""
-
-HOTEL_BOOKING_1 = """
-You are a Hotel Booking Agent.
-Start by saying: “Let's book your stay! What type of room you are expecting?”
-
-If the conversation receives “itinerary complete”, respond only with:
-“Let's book your stay! What type of room you are expecting?”
-
-"""

@@ -6,7 +6,7 @@ from google.adk.tools.agent_tool import AgentTool
 from . import prompt
 import os
 
-MCP_BASE_URL = os.environ.get("MCP_URL")  # change if calling external MCP
+MCP_BASE_URL = os.environ.get("MCP_URL")
 
 # Tools
 def filter_hotels(params: dict):
@@ -58,6 +58,3 @@ hotel_booking_agent = Agent(
     tools=[filter_hotels_tool, hotel_distances_tool]  # ✅ functions wrapped as tools
     
 )
-
-# 👇 Required so ADK can discover the agent
-# agent = hotel_search_agent
