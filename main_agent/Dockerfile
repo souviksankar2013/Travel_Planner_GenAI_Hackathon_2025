@@ -18,7 +18,10 @@ RUN pip install \
     langchain-google-genai>=2.1.10 \
     langchain-mcp>=0.2.1 \
     requests>=2.32.5 \
-    uvicorn>=0.35.0
+    uvicorn>=0.35.0 \
+    asyncpg>=0.29.0 \
+    "cloud-sql-python-connector[asyncpg]>=1.9.0"
+
 
 # Expose port for Cloud Run
 EXPOSE 8080

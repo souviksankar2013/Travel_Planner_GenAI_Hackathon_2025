@@ -15,7 +15,7 @@
 
     // Your Firebase config (replace with your project’s config from Firebase Console)
     const firebaseConfig = {
-        apiKey: "FIREBSE_API_KEY",
+        apiKey: "AIzaSyA3Is_0asWmNhGVN72fSzTwWS7mmdAOKAs",
         authDomain: "trip-planner-genai-hackathon.firebaseapp.com",
         projectId: "trip-planner-genai-hackathon",
         storageBucket: "trip-planner-genai-hackathon.firebasestorage.app",
@@ -41,7 +41,7 @@
         : result.user.uid; // fallback if no displayName
 
       // Create ADK session after login
-      fetch("[AGENT_CLOUDRUN_LINK]/create_session", {
+      fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/create_session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,7 +92,7 @@
             flex-direction: column;
         }
         header {
-            background: #1e3a8a;
+            background: linear-gradient(135deg, #3C3BEE 0%, #00C6FF 100%);;
             color: white;
             text-align: center;
            

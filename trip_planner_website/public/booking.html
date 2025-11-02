@@ -7,6 +7,12 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Include Flatpickr -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
 
   <!-- ArcGIS JS API -->
 <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
@@ -21,7 +27,7 @@
   
     // Firebase config
     const firebaseConfig = {
-      apiKey: "FIREBSE_API_KEY",
+      apiKey: "AIzaSyA3Is_0asWmNhGVN72fSzTwWS7mmdAOKAs",
       authDomain: "trip-planner-genai-hackathon.firebaseapp.com",
       projectId: "trip-planner-genai-hackathon",
       storageBucket: "trip-planner-genai-hackathon.firebasestorage.app",
@@ -32,12 +38,14 @@
   
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+
+    var firstName = null;
   
     // Protect page
     onAuthStateChanged(auth, (user) => {
       if (user) {
         const fullName = user.displayName || "Guest";
-        const firstName = fullName.split(" ")[0];  // take only the first word
+        firstName = fullName.split(" ")[0];  // take only the first word
         document.getElementById("username").innerText = `Welcome, ${user.displayName}`;
   
         // Inject bot welcome message
@@ -63,7 +71,7 @@
   if (sessionId && userId) {
     const chatWindow = document.getElementById("chatWindow");
 
-    fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
+    fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/send_message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -110,7 +118,7 @@ window.logoutUser = function () {
 
     // First destroy the session on backend
     if (sessionId && userId) {
-      fetch("[AGENT_CLOUDRUN_LINK]/destroy_session", {
+      fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/destroy_session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -234,7 +242,7 @@ window.sendMessage = function () {
     const isHandover = localStorage.getItem("handover_mode") === "true";
 
 
-    fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
+    fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/send_message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -251,9 +259,55 @@ window.sendMessage = function () {
             ? data.responses[0]
             : "Sorry, I didn't understand that.";
 
+
+
             let renderedReply;
 
             try {
+
+              // Check if agent is asking for "duration of journey"
+                // Your existing reply handling logic
+                if (/duration of journey/i.test(reply) || /date of arrival/i.test(reply))  {
+                  const inputField = document.getElementById("chatInput");
+                  inputField.type = "text"; // keep text type for flatpickr
+                  inputField.placeholder = "Select your journey dates";
+
+                  // Initialize or reinitialize the Flatpickr range picker
+                  flatpickr(inputField, {
+                    mode: "range",
+                    dateFormat: "Y-m-d",
+                    onClose: function (selectedDates) {
+                      if (selectedDates.length === 2) {
+                        const startDate = selectedDates[0].toISOString().split("T")[0];
+                        const endDate = selectedDates[1].toISOString().split("T")[0];
+                        const combined = `${startDate} - ${endDate}`;
+                        inputField.value = combined;
+                        localStorage.setItem("duration", combined);
+
+
+                      }
+                    },
+                  });
+                } else {
+
+                  
+
+                  const inputField = document.getElementById("chatInput");
+
+                  // Destroy Flatpickr instance if it still exists
+                  if (inputField._flatpickr) {
+                    inputField._flatpickr.destroy();
+                  }
+
+                  // Reset input field to normal text mode
+                  inputField.type = "text";
+                  inputField.placeholder = "Type your message...";
+                  inputField.value = ""; // Clear content when switching context
+
+                }
+
+
+
 
               // console.log (reply)
                 // Remove ```json ... ``` wrappers if present
@@ -271,8 +325,8 @@ window.sendMessage = function () {
                 renderedReply = renderItinerary(itinerary);
 
 
-                // Ask agent to list all places from itinerary
-                fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
+                // 🔹 NEW: Ask agent to list all places from itinerary
+                fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/send_message", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -322,7 +376,7 @@ window.sendMessage = function () {
                   renderedReply = `<span class="chat-message bot-msg">${cleaned}</span>`;
 
                   // 🔹 Immediately send internal message to agent
-                  fetch("[AGENT_CLOUDRUN_LINK]/send_message", {
+                  fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/send_message", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -371,6 +425,8 @@ window.sendMessage = function () {
                     console.log("window.geocodedPlaces:", window.geocodedPlaces);
 
                     openmap();
+
+                    console.log (reply)
 
                     // Now render table
                     const htmlTable = await markdownTableToHTML(reply);  // reply is your markdown string
@@ -433,7 +489,7 @@ window.sendMessage = function () {
   // ---- Helper: Save to backend ----
   function saveToBackend(endpoint, payload) {
     return fetch(
-      `[AGENT_CLOUDRUN_LINK]/${endpoint}`,
+      `https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/${endpoint}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -460,7 +516,7 @@ async function fetchgeocode() {
 
   try {
     const response = await fetch(
-      "[MCP_URL]]geocode",
+      "https://hotel-search-genai-hackathon-hotelmcp-865056791901.asia-south1.run.app/geocode",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -522,12 +578,232 @@ function renderItinerary(itinerary) {
 }
 
 
-async function markdownTableToHTML(markdown) {
-  // Split lines and remove empty ones
-  const lines = markdown.trim().split("\n").filter(l => l.trim() !== "");
-  if (lines.length < 2) return markdown; // Not a table
 
-  // ---- Detect first line as plain text ----
+// async function markdownTableToHTML(markdown) {
+//   const lines = markdown.trim().split("\n").filter(l => l.trim() !== "");
+//   if (lines.length < 2) return markdown;
+
+//   // ---- Detect intro text ----
+//   let introText = "";
+//   let tableStartIndex = 0;
+//   if (!lines[0].includes("|") || !lines[1].includes("---")) {
+//     introText = lines[0];
+//     tableStartIndex = 1;
+//   }
+
+//   // ---- Extract headers ----
+//   const headersAll = lines[tableStartIndex]
+//     .split("|")
+//     .map(h => h.trim())
+//     .filter(Boolean);
+
+//   const latIndex = headersAll.findIndex(h => /lat/i.test(h));
+//   const lonIndex = headersAll.findIndex(h => /lon/i.test(h));
+//   const touristIndex = headersAll.findIndex(h => /tourist/i.test(h));
+//   const totalDistIndex = headersAll.findIndex(h => /total\s*distance/i.test(h));
+//   const checkinIndex = headersAll.findIndex(h => /check.?in/i.test(h));
+//   const checkoutIndex = headersAll.findIndex(h => /check.?out/i.test(h));
+//   const facilitiesIndex = headersAll.findIndex(h => /facilit/i.test(h));
+
+//   // ---- Remove fields for modal only ----
+//   const headers = headersAll.filter(
+//     (_, idx) =>
+//       ![
+//         latIndex,
+//         lonIndex,
+//         touristIndex,
+//         totalDistIndex,
+//         checkinIndex,
+//         checkoutIndex,
+//         facilitiesIndex,
+//       ].includes(idx)
+//   );
+
+//   // Add custom action columns
+//   headers.push("Distance Info");
+//   headers.push("Book Hotel");
+
+//   // ---- Extract rows ----
+//   const allRows = lines.slice(tableStartIndex + 2).map(row =>
+//     row.split("|").map(cell => cell.trim()).filter(Boolean)
+//   );
+
+//   const latLongArray = [];
+//   const touristInfoArray = [];
+//   const totalDistanceArray = [];
+//   const modalDetails = [];
+
+//   const rows = allRows.map(r => {
+//     const lat = latIndex !== -1 ? parseFloat(r[latIndex]) : null;
+//     const lon = lonIndex !== -1 ? parseFloat(r[lonIndex]) : null;
+//     latLongArray.push([lat, lon]);
+//     touristInfoArray.push(touristIndex !== -1 ? r[touristIndex] : "N/A");
+//     totalDistanceArray.push(totalDistIndex !== -1 ? r[totalDistIndex] : "N/A");
+
+//     modalDetails.push({
+//       checkin: checkinIndex !== -1 ? r[checkinIndex] : "N/A",
+//       checkout: checkoutIndex !== -1 ? r[checkoutIndex] : "N/A",
+//       facilities: facilitiesIndex !== -1 ? r[facilitiesIndex] : "N/A",
+//     });
+
+//     return r.filter(
+//       (_, idx) =>
+//         ![
+//           latIndex,
+//           lonIndex,
+//           touristIndex,
+//           totalDistIndex,
+//           checkinIndex,
+//           checkoutIndex,
+//           facilitiesIndex,
+//         ].includes(idx)
+//     );
+//   });
+
+//   // ---- Build HTML ----
+//   let html = "";
+//   if (introText) {
+//     html += `<div class="chat-message bot-msg">${introText}</div>`;
+//   }
+
+//   html += `<div class="chat-message bot-msg">
+//   <table class='table table-bordered table-striped hotel-table'>
+//   <thead><tr>`;
+//   headers.forEach(h => (html += `<th>${h}</th>`));
+//   html += "</tr></thead><tbody>";
+
+//   rows.forEach((r, rowIndex) => {
+//     html += `<tr data-row-index="${rowIndex}">`;
+//     r.forEach(c => (html += `<td>${c}</td>`));
+//     html += `<td><button class="btn btn-sm btn-primary view-distance" data-index="${rowIndex}">View</button></td>`;
+//     html += `<td><button class="btn btn-sm btn-success book-hotel" data-index="${rowIndex}">Book Hotel</button></td>`;
+//     html += "</tr>";
+//   });
+
+//   html += "</tbody></table></div>";
+
+//   window.hotelLatLongs = latLongArray;
+//   window.hotelTouristPlaces = touristInfoArray;
+//   window.hotelTotalDistances = totalDistanceArray;
+//   window.hotelModalDetails = modalDetails;
+
+//   // ---- Modal Structure ----
+//   if (!document.getElementById("touristModal")) {
+//     const modalHTML = `
+//       <div class="modal fade" id="touristModal" tabindex="-1" role="dialog">
+//         <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+//           <div class="modal-content">
+//             <div class="modal-header bg-primary text-white">
+//               <h5 class="modal-title">Hotel Details</h5>
+//               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+//             </div>
+//             <div class="modal-body">
+//               <div id="touristDetails"></div>
+//             </div>
+//             <div class="modal-footer">
+//               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+//             </div>
+//           </div>
+//         </div>
+//       </div>`;
+//     document.body.insertAdjacentHTML("beforeend", modalHTML);
+//   }
+
+//   // ---- Attach Click Handlers ----
+//   setTimeout(() => {
+//     // View Distance
+//     document.querySelectorAll(".view-distance").forEach(btn => {
+//       btn.addEventListener("click", () => {
+//         const index = parseInt(btn.getAttribute("data-index"));
+//         const modalInfo = window.hotelModalDetails[index];
+//         const places = window.hotelTouristPlaces[index] || "N/A";
+//         const totalDist = window.hotelTotalDistances[index] || "N/A";
+
+//         document.getElementById("touristDetails").innerHTML = `
+//           <div><strong>Tourist Places:</strong><br>${places}</div><hr>
+//           <div><strong>Total Distance:</strong> ${totalDist}</div><hr>
+//           <div><strong>Check-in:</strong> ${modalInfo.checkin}</div>
+//           <div><strong>Check-out:</strong> ${modalInfo.checkout}</div>
+//           <div><strong>Facilities:</strong> ${modalInfo.facilities}</div>
+//         `;
+
+//         const modal = new bootstrap.Modal(document.getElementById("touristModal"));
+//         modal.show();
+//       });
+//     });
+
+//     // Book Hotel
+
+//     // Book Hotel (fixed)
+// document.querySelectorAll(".book-hotel").forEach(btn => {
+//   btn.addEventListener("click", (ev) => {
+//     ev.stopPropagation(); // prevent row-click zoom when clicking the button
+
+//     const index = parseInt(btn.getAttribute("data-index"), 10);
+//     const tr = btn.closest("tr");
+//     if (!tr) return;
+
+//     // Convert NodeList -> Array
+//     const cellsArr = Array.from(tr.querySelectorAll("td"));
+
+//     // Build header->index map (read current table headers)
+//     const headerTexts = Array.from(document.querySelectorAll("table thead th")).map(th =>
+//       th.textContent.trim()
+//     );
+
+//     // Find indexes for columns (case-insensitive)
+//     const nameCol = headerTexts.findIndex(h => /name/i.test(h));
+//     const ratingCol = headerTexts.findIndex(h => /rating/i.test(h));
+//     const roomsCol = headerTexts.findIndex(h => /room/i.test(h));
+//     const priceCol = headerTexts.findIndex(h => /\bprice\b/i.test(h) || /prices?/i.test(h));
+
+//     // Safely read cell text (fall back to "N/A")
+//     const safeText = (arr, idx) => {
+//       if (idx === -1) return "N/A";
+//       const el = arr[idx];
+//       return el ? el.textContent.trim() : "N/A";
+//     };
+
+//     const hotelName = safeText(cellsArr, nameCol);
+//     const rating = safeText(cellsArr, ratingCol);
+//     const rooms = safeText(cellsArr, roomsCol);
+//     const price = safeText(cellsArr, priceCol);
+//     const duration = localStorage.getItem("duration");
+
+//     const bookingString = `${hotelName}_${rating}_${rooms}_${price}_${duration}`;
+//     alert(bookingString);
+//   });
+// });
+
+
+
+//     // Row click zoom
+//     const headers = Array.from(document.querySelectorAll("table thead th")).map(th =>
+//       th.textContent.trim()
+//     );
+
+//     document.querySelectorAll("tr[data-row-index]").forEach(tr => {
+//       tr.addEventListener("click", () => {
+//         const idx = parseInt(tr.getAttribute("data-row-index"));
+//         const coords = window.hotelLatLongs[idx];
+
+//         if (window.mapView && coords) {
+//           window.mapView.goTo({ center: [coords[1], coords[0]], zoom: 15 }).catch(console.error);
+//         }
+//       });
+//     });
+//   }, 200);
+
+//   return html;
+// }
+
+
+
+async function markdownTableToHTML(markdown) {
+  const lines = markdown.trim().split("\n").filter(l => l.trim() !== "");
+  if (lines.length < 2) return markdown;
+
+  // ---- Detect intro text ----
   let introText = "";
   let tableStartIndex = 0;
   if (!lines[0].includes("|") || !lines[1].includes("---")) {
@@ -543,8 +819,30 @@ async function markdownTableToHTML(markdown) {
 
   const latIndex = headersAll.findIndex(h => /lat/i.test(h));
   const lonIndex = headersAll.findIndex(h => /lon/i.test(h));
+  const touristIndex = headersAll.findIndex(h => /tourist/i.test(h));
+  const totalDistIndex = headersAll.findIndex(h => /total\s*distance/i.test(h));
+  const checkinIndex = headersAll.findIndex(h => /check.?in/i.test(h));
+  const checkoutIndex = headersAll.findIndex(h => /check.?out/i.test(h));
+  const facilitiesIndex = headersAll.findIndex(h => /facilit/i.test(h));
+  const addressIndex = headersAll.findIndex(h => /address/i.test(h)); // 🆕 Added Address detection
 
-  const headers = headersAll.filter((h, idx) => idx !== latIndex && idx !== lonIndex);
+  // ---- Remove fields for modal-only ----
+  const headers = headersAll.filter(
+    (_, idx) =>
+      ![
+        latIndex,
+        lonIndex,
+        touristIndex,
+        totalDistIndex,
+        checkinIndex,
+        checkoutIndex,
+        facilitiesIndex,
+      ].includes(idx)
+  );
+
+  // Add custom action columns
+  headers.push("Distance Info");
+  headers.push("Book Hotel");
 
   // ---- Extract rows ----
   const allRows = lines.slice(tableStartIndex + 2).map(row =>
@@ -552,11 +850,36 @@ async function markdownTableToHTML(markdown) {
   );
 
   const latLongArray = [];
+  const touristInfoArray = [];
+  const totalDistanceArray = [];
+  const modalDetails = [];
+
   const rows = allRows.map(r => {
-    if (latIndex !== -1 && lonIndex !== -1) {
-      latLongArray.push([parseFloat(r[latIndex]), parseFloat(r[lonIndex])]);
-    }
-    return r.filter((c, idx) => idx !== latIndex && idx !== lonIndex);
+    const lat = latIndex !== -1 ? parseFloat(r[latIndex]) : null;
+    const lon = lonIndex !== -1 ? parseFloat(r[lonIndex]) : null;
+    latLongArray.push([lat, lon]);
+    touristInfoArray.push(touristIndex !== -1 ? r[touristIndex] : "N/A");
+    totalDistanceArray.push(totalDistIndex !== -1 ? r[totalDistIndex] : "N/A");
+
+    modalDetails.push({
+      address: addressIndex !== -1 ? r[addressIndex] : "N/A", // 🆕 Save Address
+      checkin: checkinIndex !== -1 ? r[checkinIndex] : "N/A",
+      checkout: checkoutIndex !== -1 ? r[checkoutIndex] : "N/A",
+      facilities: facilitiesIndex !== -1 ? r[facilitiesIndex] : "N/A",
+    });
+
+    return r.filter(
+      (_, idx) =>
+        ![
+          latIndex,
+          lonIndex,
+          touristIndex,
+          totalDistIndex,
+          checkinIndex,
+          checkoutIndex,
+          facilitiesIndex,
+        ].includes(idx)
+    );
   });
 
   // ---- Build HTML ----
@@ -565,53 +888,131 @@ async function markdownTableToHTML(markdown) {
     html += `<div class="chat-message bot-msg">${introText}</div>`;
   }
 
-  html += `<div class="chat-message bot-msg"><table class='table table-bordered table-striped'><thead><tr>`;
-  headers.forEach(h => html += `<th>${h}</th>`);
+  html += `<div class="chat-message bot-msg">
+  <table class='table table-bordered table-striped hotel-table'>
+  <thead><tr>`;
+  headers.forEach(h => (html += `<th>${h}</th>`));
   html += "</tr></thead><tbody>";
 
   rows.forEach((r, rowIndex) => {
     html += `<tr data-row-index="${rowIndex}">`;
-    r.forEach(c => html += `<td>${c}</td>`);
+    r.forEach(c => (html += `<td>${c}</td>`));
+    html += `<td><button class="btn btn-sm btn-primary view-distance" data-index="${rowIndex}">View</button></td>`;
+    html += `<td><button class="btn btn-sm btn-success book-hotel" data-index="${rowIndex}">Book Hotel</button></td>`;
     html += "</tr>";
   });
+
   html += "</tbody></table></div>";
 
-  window.hotelLatLongs = latLongArray; // store lat/lngs globally
+  window.hotelLatLongs = latLongArray;
+  window.hotelTouristPlaces = touristInfoArray;
+  window.hotelTotalDistances = totalDistanceArray;
+  window.hotelModalDetails = modalDetails;
 
-  // Attach click events to table rows
-setTimeout(() => { 
-  const headers = Array.from(document.querySelectorAll("table thead th")).map(th => th.textContent.trim());
+  // ---- Modal Structure ----
+  if (!document.getElementById("touristModal")) {
+    const modalHTML = `
+      <div class="modal fade" id="touristModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+          <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+              <h5 class="modal-title">Hotel Details</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div id="touristDetails"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML("beforeend", modalHTML);
+  }
 
-  document.querySelectorAll("tr[data-row-index]").forEach(tr => {
-    tr.addEventListener("click", () => {
-      const idx = parseInt(tr.getAttribute("data-row-index"));
-      const coords = window.hotelLatLongs[idx];
+  // ---- Attach Click Handlers ----
+  setTimeout(() => {
+    // View Distance Button
+    document.querySelectorAll(".view-distance").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const index = parseInt(btn.getAttribute("data-index"));
+        const modalInfo = window.hotelModalDetails[index];
+        const places = window.hotelTouristPlaces[index] || "N/A";
+        const totalDist = window.hotelTotalDistances[index] || "N/A";
 
-      // Build dictionary for the clicked row
-      const cells = Array.from(tr.querySelectorAll("td"));
-      const rowData = {};
-      headers.forEach((header, i) => {
-        rowData[header] = cells[i]?.textContent.trim() || null;
+        document.getElementById("touristDetails").innerHTML = `
+          <div><strong>Address:</strong> ${modalInfo.address}</div><hr>
+          <div><strong>Tourist Places:</strong><br>${places}</div><hr>
+          <div><strong>Total Distance:</strong> ${totalDist}</div><hr>
+          <div><strong>Check-in:</strong> ${modalInfo.checkin}</div>
+          <div><strong>Check-out:</strong> ${modalInfo.checkout}</div>
+          <div><strong>Facilities:</strong> ${modalInfo.facilities}</div>
+        `;
+
+        const modal = new bootstrap.Modal(document.getElementById("touristModal"));
+        modal.show();
       });
-
-      // Store or log the row data
-      window.lastClickedRowData = rowData; 
-      console.log("Clicked row data:", rowData);
-
-      // Zoom map if available
-      if (window.mapView && coords) {
-        window.mapView.goTo({ center: [coords[1], coords[0]], zoom: 15 })
-          .catch(err => console.error("Map zoom error:", err));
-      } else if (coords) {
-        alert(`Latitude: ${coords[0]}, Longitude: ${coords[1]}`);
-      }
     });
-  });
-}, 100);
 
+    // Book Hotel
+    // ---- Book Hotel Button ----
+document.querySelectorAll(".book-hotel").forEach(btn => {
+  btn.addEventListener("click", ev => {
+    ev.stopPropagation();
+
+    const tr = btn.closest("tr");
+    if (!tr) return;
+
+    const rowIndex = parseInt(btn.getAttribute("data-index"), 10);
+    const cellsArr = Array.from(tr.querySelectorAll("td"));
+    const headerTexts = Array.from(document.querySelectorAll("table thead th")).map(th =>
+      th.textContent.trim()
+    );
+
+    // Ignore last two action columns ("Distance Info" and "Book Hotel")
+    const effectiveHeaders = headerTexts.slice(0, headerTexts.length - 2);
+
+    // Find relevant columns by header name
+    const nameCol = effectiveHeaders.findIndex(h => /name/i.test(h));
+    const ratingCol = effectiveHeaders.findIndex(h => /rating/i.test(h));
+    const roomsCol = effectiveHeaders.findIndex(h => /room/i.test(h));
+    const priceCol = effectiveHeaders.findIndex(h => /\bprice\b/i.test(h) || /prices?/i.test(h));
+
+    // Safe getter
+    const safeText = (arr, idx) => {
+      if (idx === -1 || idx >= arr.length) return "N/A";
+      const el = arr[idx];
+      return el ? el.textContent.trim() : "N/A";
+    };
+
+    const hotelName = safeText(cellsArr, nameCol);
+    const rating = safeText(cellsArr, ratingCol);
+    const rooms = safeText(cellsArr, roomsCol);
+    const price = safeText(cellsArr, priceCol);
+    const duration = localStorage.getItem("duration");
+
+    const bookingString = `${hotelName}_${rating}_${rooms}_${price}_${duration}`;
+    alert(bookingString);
+  });
+});
+
+
+    // Row click zoom
+    document.querySelectorAll("tr[data-row-index]").forEach(tr => {
+      tr.addEventListener("click", () => {
+        const idx = parseInt(tr.getAttribute("data-row-index"));
+        const coords = window.hotelLatLongs[idx];
+        if (window.mapView && coords) {
+          window.mapView.goTo({ center: [coords[1], coords[0]], zoom: 15 }).catch(console.error);
+        }
+      });
+    });
+  }, 200);
 
   return html;
 }
+
 
 
 
@@ -780,6 +1181,129 @@ function renderOptions(text) {
   }
 };
 
+window.openBookingHistory= function () {
+    window.location.href = "history.html"; // make sure file name matches
+  }
+
+window.createSession = function () {
+
+
+  const userId = localStorage.getItem("user_id");
+
+
+  fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/destroy_session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: first_n,
+          session_id: sessionId
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log("Session destroyed:", data);
+
+
+        })
+        .catch((err) => {
+          console.error("Error destroying session:", err);
+        })
+        .finally(() => {
+          localStorage.removeItem("place_name");
+          localStorage.removeItem("places");
+          // Clear session info from localStorage
+          // localStorage.removeItem("session_id");
+          // localStorage.removeItem("user_id");
+          // localStorage.clear();   // clears all keys for the current domain
+
+
+          fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/create_session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.session_id) {
+        localStorage.setItem("session_id", data.session_id);
+        localStorage.setItem("user_id", data.user_id);
+
+        console.log("New session created:", data.session_id);
+        // alert("New session started!");
+        // optional: clear old chat UI
+        document.getElementById("chatWindow").innerHTML = "";
+        const sessionId = localStorage.getItem("session_id");
+
+//first message sesssion created
+
+        if (sessionId && userId) {
+    const chatWindow = document.getElementById("chatWindow");
+
+    fetch("https://hotel-search-genai-hackathon-main-865056791901.asia-south1.run.app/send_message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: first_n,
+        session_id: sessionId,
+        text: "session created"
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Agent response (session created):", data);
+
+        const reply =
+          data.responses && data.responses.length > 0
+            ? data.responses[0]
+            : "No welcome response received.";
+
+        const botMsg = document.createElement("div");
+        botMsg.className = "text-start mb-2";
+        botMsg.innerHTML = `<span class="chat-message bot-msg">${reply}</span>`;
+        chatWindow.appendChild(botMsg);
+
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      })
+      .catch((err) => {
+        console.error("Error sending session created:", err);
+
+        const botMsg = document.createElement("div");
+        botMsg.className = "text-start mb-2";
+        botMsg.innerHTML = `<span class="chat-message bot-msg">Failed to initialize chat session.</span>`;
+        chatWindow.appendChild(botMsg);
+      });
+  }
+
+
+
+
+
+
+
+      } else {
+        alert("Failed to create session");
+      }
+    })
+    .catch(err => console.error("Error creating session:", err));
+
+
+
+
+        });
+
+
+
+
+
+
+  
+
+
+};
+
+
+
+
 
   </script>
   
@@ -796,7 +1320,7 @@ function renderOptions(text) {
     }
 
     header {
-      background: #1e3a8a;
+      background:linear-gradient(135deg, #3C3BEE 0%, #00C6FF 100%);
       color: white;
       padding: 15px 20px;
       display: flex;
@@ -826,7 +1350,7 @@ function renderOptions(text) {
       top: 0;
       width: 250px;
       height: 100%;
-      background: #1e3a8a;
+      background: linear-gradient(135deg, #3C3BEE 0%, #00C6FF 100%);;
       color: white;
       padding-top: 60px;
       z-index: 1000;
@@ -891,7 +1415,7 @@ function renderOptions(text) {
 
     /* User message */
     .user-msg {
-      background: #1e40af;
+      background: #3C3BEE;
       color: white;
       text-align: right;
       font-weight: 500;
@@ -899,7 +1423,7 @@ function renderOptions(text) {
 
     /* Bot message */
     .bot-msg {
-      background: #6b7280;
+      background: #2f3a83;
       color: white;
       text-align: left;
       font-weight: 500;
@@ -980,8 +1504,8 @@ function renderOptions(text) {
   <!-- Sidebar -->
   <div id="sidebar">
     <ul>
-      <li onclick="alert('New Booking clicked')">New Booking</li>
-      <li>Booking History</li>
+      <li onclick="createSession()">New Booking</li>
+      <li onclick="openBookingHistory()">Booking History</li>
       <li onclick="logoutUser()">Logout</li>
     </ul>
   </div>
@@ -999,6 +1523,8 @@ function renderOptions(text) {
 <div id="bookingHistoryPanel">
   <div id="mapView"></div>
 </div>
+
+
 
 </body>
 </html>

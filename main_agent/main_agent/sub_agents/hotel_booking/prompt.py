@@ -90,11 +90,11 @@ After function execution, present results as a **table**.
 
 **For `filter_hotels`:**
 Columns →
-`Name | Rating | Rooms | Prices | Checkin | Checkout | Facilities | Latitude | Longitude`
+`Name | Address | Rating | Rooms | Prices | Checkin | Checkout | Facilities | Latitude | Longitude`
 
 **For `hotel_distances`:**
 Columns →
-`Name | Rating | Rooms | Prices | Checkin | Checkout | Facilities | Latitude | Longitude | Tourist Places | Total Distance`
+`Name | Address | Rating | Rooms | Prices | Checkin | Checkout | Facilities | Latitude | Longitude | Tourist Places | Total Distance`
 
 * **Tourist Places column** → includes all requested tourist places with distances, line-separated inside the cell.
 
@@ -219,13 +219,32 @@ Show me top 5 hotels near India Gate and Red Fort, min 4-star.
 
 **Result Table Example**
 
-| Hotel   | Rating | Rooms    | Prices | Checkin | Checkout | Facilities | Latitude | Longitude | Tourist Places                         | Total Distance |
-| ------- | ------ | -------- | ------ | ------- | -------- | ---------- | -------- | --------- | -------------------------------------- | -------------- |
-| Hotel A | 4.5    | Deluxe   | 3200   | 2 PM    | 11 AM    | WiFi, Pool | 28.6129  | 77.2295   | India Gate: 1.2 km<br>Red Fort: 3.5 km | 4.7 km         |
-| Hotel B | 4.2    | Standard | 2800   | 1 PM    | 12 PM    | WiFi       | 28.6205  | 77.2340   | India Gate: 2.1 km<br>Red Fort: 2.9 km | 5.0 km         |
-| Hotel C | 4.0    | Deluxe   | 3500   | 2 PM    | 11 AM    | WiFi, Gym  | 28.6250  | 77.2301   | India Gate: 1.8 km<br>Red Fort: 4.0 km | 5.8 km         |
-
+| Hotel   | Address                      | Rating | Rooms    | Prices | Checkin | Checkout | Facilities | Latitude | Longitude | Tourist Places                         | Total Distance |
+| -------- | --------------------------------- | ------ | -------- | ------ | ------- | -------- | ---------- | -------- | --------- | -------------------------------------- | -------------- |
+| Hotel A | 123 Connaught Place, New Delhi     | 4.5    | Deluxe   | 3200   | 2 PM    | 11 AM    | WiFi, Pool | 28.6129  | 77.2295   | India Gate: 1.2 km<br>Red Fort: 3.5 km | 4.7 km         |
+| Hotel B | 45 Lodhi Road, New Delhi           | 4.2    | Standard | 2800   | 1 PM    | 12 PM    | WiFi       | 28.6205  | 77.2340   | India Gate: 2.1 km<br>Red Fort: 2.9 km | 5.0 km         |
+| Hotel C | 89 Karol Bagh, New Delhi           | 4.0    | Deluxe   | 3500   | 2 PM    | 11 AM    | WiFi, Gym  | 28.6250  | 77.2301   | India Gate: 1.8 km<br>Red Fort: 4.0 km | 5.8 km         |
 
 
 """
 
+FILTER_HOTELS_INSTR = """
+You are a tool to filter hotels.
+Input will include criteria like stars, price range, amenities.
+Return a JSON response with matching hotels.
+"""
+
+HOTEL_DISTANCES_INSTR = """
+You are a tool to compute distances between hotels and a given location.
+Input will include hotel coordinates and user location.
+Return a JSON response with distances.
+"""
+
+HOTEL_BOOKING_1 = """
+You are a Hotel Booking Agent.
+Start by saying: “Let's book your stay! What type of room you are expecting?”
+
+If the conversation receives “itinerary complete”, respond only with:
+“Let's book your stay! What type of room you are expecting?”
+
+"""

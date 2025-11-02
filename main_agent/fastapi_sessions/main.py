@@ -1,62 +1,83 @@
 import asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import HTTPException
 from pydantic import BaseModel
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from google.genai import types as genai_types
-from main_agent.agent import root_agent
 from google.adk.events import Event, EventActions
+from main_agent.agent import root_agent
+from google.cloud.sql.connector import Connector, IPTypes
+from typing import Optional
+import os
 import time
 import uuid
-from typing import Optional
 
 
+# ------------------------------------------
 # Initialize FastAPI
+# ------------------------------------------
 app = FastAPI()
 
-# Session service (in-memory for demo; replace with Firestore/Redis in production)
 session_service = InMemorySessionService()
-
-# Create a runner for the agent
 runner = Runner(agent=root_agent, app_name="main_agent", session_service=session_service)
 
-
+# ------------------------------------------
 # CORS setup
+# ------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://trip-planner-genai-hackathon.web.app"],  # only your frontend
+    allow_origins=["https://trip-planner-genai-hackathon.web.app"],
     allow_credentials=True,
-    allow_methods=["*"],  # or ["POST", "GET", "OPTIONS"]
-    allow_headers=["*"],  # or ["Content-Type", "Authorization"]
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+# ------------------------------------------
+# Cloud SQL Connection (Loop-safe)
+# ------------------------------------------
+
+async def get_db_connection():
+    """
+    Create and close a Cloud SQL connection safely per request.
+    Avoids event loop mismatch errors.
+    """
+    # Create connector *inside* the function (loop-safe)
+    async with Connector() as connector:
+        conn = await connector.connect_async(
+            os.getenv("INSTANCE_CONNECTION_NAME"),
+            "asyncpg",
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD"),
+            db=os.getenv("DB_NAME", "booking"),
+            ip_type=IPTypes.PUBLIC,  # Use PRIVATE if using VPC
+        )
+        return conn
 
 
-
-# Request models
+# ------------------------------------------
+# Request Models
+# ------------------------------------------
 class CreateSessionRequest(BaseModel):
     user_id: str
-
 
 class SendMessageRequest(BaseModel):
     user_id: str
     session_id: str
     text: str
 
-
 class DestroySessionRequest(BaseModel):
     user_id: str
     session_id: str
 
-
-APP_NAME = "main_agent"
-
-class PlaceRequest(BaseModel):
-    session_id: str
-    place_name: str
-    user_id: str
+class BookingRequest(BaseModel):
+    user_name: str
+    email: str
+    hotel_name: str
+    room_type: str
+    price: float
+    arrival_date: str
+    departure_date: str
 
 class UserInputRequest(BaseModel):
     session_id: str
@@ -64,22 +85,18 @@ class UserInputRequest(BaseModel):
     place_name: Optional[str] = None
     duration: Optional[str] = None
     budget: Optional[str] = None
-    places:  Optional[str] = None
+    places: Optional[str] = None
 
-
-
+# ------------------------------------------
 # Endpoints
+# ------------------------------------------
 @app.post("/create_session")
 async def create_session(req: CreateSessionRequest):
-    """
-    Creates a new ADK session and stores the username in session state.
-    """
     session = await session_service.create_session(
         app_name="main_agent",
         user_id=req.user_id,
-        state={"username": req.user_id}   # store username in session state
+        state={"username": req.user_id}
     )
-
     return {
         "message": f"Session created for {req.user_id}",
         "session_id": session.id,
@@ -87,12 +104,8 @@ async def create_session(req: CreateSessionRequest):
         "state": session.state
     }
 
-
 @app.post("/send_message")
 async def send_message(req: SendMessageRequest):
-    """
-    Sends a message to the agent using the Runner and returns the response.
-    """
     responses = []
     async for event in runner.run_async(
         user_id=req.user_id,
@@ -104,10 +117,45 @@ async def send_message(req: SendMessageRequest):
     ):
         if event.is_final_response() and event.content and event.content.parts:
             responses.append(event.content.parts[0].text)
-
     return {"responses": responses}
 
+@app.post("/saveBooking")
+async def save_booking(req: BookingRequest):
+    """
+    Saves booking details into Google Cloud SQL (PostgreSQL).
+    """
+    conn = None
+    try:
+        # Get both connection and connector
+        conn= await get_db_connection()
 
+        # Execute insert query
+        await conn.execute(
+            """
+            INSERT INTO booking (
+                user_name, email, hotel_name, room_type,
+                price, arrival_date, departure_date, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            """,
+            req.user_name,
+            req.email,
+            req.hotel_name,
+            req.room_type,
+            req.price,
+            req.arrival_date,
+            req.departure_date,
+        )
+
+        return {"status": "success", "message": "Booking saved successfully"}
+
+    except Exception as e:
+        import traceback
+        print("DB ERROR:", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error saving booking: {str(e)}")
+
+    finally:
+        if conn:
+            await conn.close()
 
 @app.post("/save_user_input")
 async def save_user_input(req: UserInputRequest):
@@ -126,7 +174,6 @@ async def save_user_input(req: UserInputRequest):
         state_changes["duration"] = req.duration
     if req.budget:
         state_changes["budget"] = req.budget
-    
     if req.places:
         state_changes["places"] = req.places
 
@@ -138,7 +185,6 @@ async def save_user_input(req: UserInputRequest):
         timestamp=int(time.time() * 1000),
     )
     await session_service.append_event(session, event)
-
     updated_session = await session_service.get_session(
         app_name="main_agent",
         user_id=session.user_id,
@@ -147,18 +193,9 @@ async def save_user_input(req: UserInputRequest):
 
     return {"status": "ok", "session": updated_session.state}
 
-
-
-
-
-
 @app.post("/destroy_session")
 async def destroy_session(req: DestroySessionRequest):
-    """
-    Destroys an existing ADK session for the given user and session_id.
-    """
     try:
-        # Attempt to delete the session
         await session_service.delete_session(
             app_name="main_agent",
             user_id=req.user_id,
@@ -167,4 +204,3 @@ async def destroy_session(req: DestroySessionRequest):
         return {"message": f"Session {req.session_id} destroyed for {req.user_id}"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
